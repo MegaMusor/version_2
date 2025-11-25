@@ -22,6 +22,7 @@ void handle_wiegand_bit(uint8_t bit);
 void process_wiegand_data(void);
 void reset_wiegand(void);
 void speed_test(void);
+void set_wiegand_debug(bool enable);  // Добавляем эту функцию
 
 // Format-specific processors
 void process_26bit_wiegand(void);

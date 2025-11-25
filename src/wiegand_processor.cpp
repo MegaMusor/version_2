@@ -14,11 +14,17 @@ bool wiegand_data_ready = false;
 uint32_t total_bits_received = 0;
 uint32_t card_read_count = 0;
 
+// Добавляем флаг для подавления лишнего вывода
+static bool debug_output = true;
+
 void check_wiegand() {
     uint8_t data;
     esp_err_t ret = pcf8574_read(CONFIG_I2C_INPUTS1_ADDRESS, &data);
     
     if (ret != ESP_OK) {
+        if (debug_output) {
+            printf("❌ I2C read error: %d\n", ret);
+        }
         return;
     }
     
@@ -30,6 +36,7 @@ void check_wiegand() {
     static uint8_t last_d0 = 1;
     static uint8_t last_d1 = 1;
     
+    // Обнаружение фронтов
     if (d0_state && !last_d0) {
         handle_wiegand_bit(0);
     }
@@ -41,23 +48,35 @@ void check_wiegand() {
     last_d0 = d0_state;
     last_d1 = d1_state;
     
+    // Таймаут только если есть данные и прошло достаточно времени
     if (wiegand_bit_count > 0 && (current_time - wiegand_last_bit_time) > WIEGAND_TIMEOUT_MS) {
         wiegand_data_ready = true;
+        if (debug_output) {
+            printf("⏰ Timeout triggered, bits: %d\n", wiegand_bit_count);
+        }
     }
 }
 
 void handle_wiegand_bit(uint8_t bit) {
     uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
     
+    // Сброс если прошло много времени с последнего бита
     if ((current_time - wiegand_last_bit_time) > WIEGAND_TIMEOUT_MS) {
         wiegand_data = 0;
         wiegand_bit_count = 0;
+        if (debug_output) {
+            printf("🔄 Reset Wiegand data\n");
+        }
     }
     
     wiegand_data = (wiegand_data << 1ULL) | (uint64_t)bit;
     wiegand_bit_count++;
     total_bits_received++;
     wiegand_last_bit_time = current_time;
+    
+    if (debug_output && wiegand_bit_count <= 3) {
+        printf("📊 Bit: %d, Total bits: %d\n", bit, wiegand_bit_count);
+    }
 }
 
 void process_wiegand_data() {
@@ -67,6 +86,7 @@ void process_wiegand_data() {
     
     printf("\n🎫 === WIEGAND CARD DETECTED ===\n");
     printf("🔢 Raw Bit count: %d\n", wiegand_bit_count);
+    printf("🔢 Raw Data: 0x%016llX\n", wiegand_data);
     
     printf("🔍 Analysis:\n");
     if (wiegand_bit_count < 26) {
@@ -89,6 +109,7 @@ void process_wiegand_data() {
     reset_wiegand();
 }
 
+// Остальные функции без изменений...
 void process_26bit_wiegand() {
     uint8_t facility_code = (uint8_t)((wiegand_data >> 17ULL) & 0xFFULL);
     uint16_t card_code = (uint16_t)((wiegand_data >> 1ULL) & 0xFFFFULL);
@@ -151,5 +172,11 @@ void speed_test() {
     
     if (current_time - last_test > 10000) {
         last_test = current_time;
+        // Убираем вывод чтобы не засорять консоль
     }
+}
+
+// Функция для управления отладочным выводом
+void set_wiegand_debug(bool enable) {
+    debug_output = enable;
 }
