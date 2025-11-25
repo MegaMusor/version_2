@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "../../../1test"
+		},
+		{
+			"name": "version_2",
+			"path": "../.."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"wiegand_io.h": "c"
+		}
+	}
+}
